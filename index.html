@@ -50,31 +50,12 @@ var dom = {
 
 dom.ctx = dom.eq.getContext("2d");
 
-var created = createAnalyser(dom.aud)
-dom.analyser = created.analyser
-
 // draft state
 var state = {
   width: null,
   height: null,
-  columns: new Array(created.frequencyData.length),
-  frequencyData: created.frequencyData,
-}
-
-// initial state
-for (var i = 0; i < state.columns.length; i++) {
-  state.columns[i] = {
-    num: i,
-    value: null,
-    totalX: state.columns.length,
-    totalY: 255,
-    sizeX: null,
-    sizeY: null,
-    x: null,
-    xBase: null,
-    y: null,
-    yBase: null,
-  }
+  columns: [],
+  frequencyData: null,
 }
 
 var drawed = {
@@ -83,15 +64,43 @@ var drawed = {
   data: null,
 }
 
+initAudio()
 onSize()
 draw();
 
+
 window.onresize = onSize;
+window.onclick = () => {
+  if (!dom.audioSrc) {
+    return
+  }
+
+  window.onclick = null
+  dom.audioCtx.resume()
+}
+
+
+function initAudio() {
+  var created = createAnalyser(dom.aud)
+  dom.analyser = created.analyser
+  state.columns = new Array(created.frequencyData.length)
+  state.frequencyData = created.frequencyData
+
+  initColumns()
+  calcSizes()
+}
 
 function onSize() {
   state.width = eq.parentNode.offsetWidth;
   state.height = eq.parentNode.offsetHeight;
 
+  calcSizes()
+
+  drawed.width = null
+  drawed.height = null;
+}
+
+function calcSizes() {
   for (var i = 0; i < state.columns.length; i++) {
     state.columns[i].sizeX = state.width / state.columns.length;
     state.columns[i].sizeY = state.height / 255;
@@ -102,8 +111,25 @@ function onSize() {
 
   // invalidate drawed data mark
   drawed.data = false;
-  drawed.width = null
-  drawed.height = null;
+}
+
+
+function initColumns() {
+  // initial state
+  for (var i = 0; i < state.columns.length; i++) {
+    state.columns[i] = {
+      num: i,
+      value: null,
+      totalX: state.columns.length,
+      totalY: 255,
+      sizeX: null,
+      sizeY: null,
+      x: null,
+      xBase: null,
+      y: null,
+      yBase: null,
+    }
+  }
 }
 
 function calcX(width, output) {
@@ -221,16 +247,22 @@ function draw() {
   drawState()
 };
 
-
 function createAnalyser(audioElement) {
 
   var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
   var audioSrc = audioCtx.createMediaElementSource(audioElement);
-  var analyser = audioCtx.createAnalyser();
-
-
-  audioSrc.connect(analyser);
   audioSrc.connect(audioCtx.destination);
+
+
+
+  var analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 256;
+  audioSrc.connect(analyser);
+
+  dom.audioSrc = audioSrc;
+  dom.audioCtx = audioCtx;
+  dom.analyser = analyser;
 
   var bufferSize = analyser.frequencyBinCount
   var frequencyData = new Uint8Array(bufferSize);
